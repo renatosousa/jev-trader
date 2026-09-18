@@ -9,7 +9,7 @@ Dois módulos por enquanto:
 
 Um módulo de volatilidade/opções (IV, put wall, call wall, gamma flip, open interest) está planejado, ainda não implementado.
 
-**Não tem interface gráfica ainda** — tudo roda via linha de comando (`signal_demo.py`, `sentiment.py`). Um dashboard web simples é um próximo passo natural, se fizer sentido.
+- **Dashboard** ([dashboard/](dashboard/)) — página web local que mostra os sinais da cesta em tempo real (atualiza sozinha em segundo plano).
 
 ## Arquitetura
 
@@ -138,6 +138,27 @@ A cesta padrão em [signals/instruments.py](signals/instruments.py) usa nomencla
 ## Cesta de ativos
 
 Editável em [signals/instruments.py](signals/instruments.py) — FX, metais, energia, juros (proxy) e crypto por padrão. `get_instrument(symbol)` busca um ativo específico.
+
+## Dashboard
+
+Página local que roda a cesta em segundo plano e mostra os sinais numa tabela (ação, força, convicção, RSI, volatilidade), atualizando sozinha.
+
+```bash
+.venv/bin/pip install -r requirements.txt  # inclui flask
+.venv/bin/python dashboard/app.py
+```
+
+Abra `http://127.0.0.1:5050`. Variáveis de ambiente:
+
+| Variável | Padrão | O que faz |
+| --- | --- | --- |
+| `SIGNAL_PROVIDER` | `mock` | `mock` (dados sintéticos) ou `mt5` (dados reais, requer terminal MT5 aberto — ver seção acima) |
+| `SIGNAL_SYMBOLS` | cesta padrão do provider | lista separada por vírgula, ex: `EURUSD,XAUUSD`, pra rodar só alguns ativos |
+| `DASHBOARD_REFRESH_SECONDS` | `300` | intervalo entre passadas completas pela cesta (cada ativo já é espaçado pelo `JEV_MIN_INTERVAL_MS` do bridge) |
+| `SIGNAL_TIMEFRAME_MINUTES` | `60` | timeframe das velas usadas pros indicadores |
+| `DASHBOARD_PORT` | `5050` | porta do servidor |
+
+O bridge (`node bridge/server.mjs`) precisa estar rodando — o dashboard fala com o Jev através dele, igual o `signal_demo.py`.
 
 ## Limites de custo/rate limit
 

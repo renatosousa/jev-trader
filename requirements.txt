@@ -1,3 +1,4 @@
 typesafe-sdk
 pytest
 mt5linux  # cliente rpyc: fala com MetaTrader5 rodando em Wine (ver signals/market_data.py)
+flask  # dashboard/app.py

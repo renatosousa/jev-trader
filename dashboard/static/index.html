@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jev-trader · sinais</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #141922;
+    --border: #232a37;
+    --text: #e6e9ef;
+    --muted: #8b93a5;
+    --buy: #2fbf71;
+    --sell: #e5484d;
+    --hold: #5b6472;
+    --accent: #4f9dff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+  h1 span { color: var(--muted); font-weight: 400; }
+  #meta {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  #meta b { color: var(--text); }
+  #error {
+    background: #2a1418;
+    border: 1px solid var(--sell);
+    color: #ffb4b8;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    display: none;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  th, td {
+    padding: 12px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  th {
+    color: var(--muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+  tr:last-child td { border-bottom: none; }
+  .symbol { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .pill.comprar { background: rgba(47,191,113,0.15); color: var(--buy); }
+  .pill.vender { background: rgba(229,72,77,0.15); color: var(--sell); }
+  .pill.manter { background: rgba(91,100,114,0.2); color: var(--muted); }
+  .bar-wrap {
+    width: 90px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill { height: 100%; border-radius: 3px; }
+  .bar-fill.strength { background: var(--accent); }
+  .bar-fill.conviction { background: var(--buy); }
+  .bar-label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .summary { color: var(--muted); max-width: 420px; }
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px;
+  }
+  .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>jev-trader <span>· sinais em tempo real</span></h1>
+    <div id="meta">
+      provider: <b id="provider">–</b> ·
+      última atualização: <b id="updated-at">–</b>
+      <span id="updating-badge" class="badge" style="display:none;">atualizando…</span>
+    </div>
+  </header>
+
+  <div id="error"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Ativo</th>
+        <th>Ação</th>
+        <th>Força</th>
+        <th>Convicção</th>
+        <th>RSI</th>
+        <th>Volatilidade</th>
+        <th>Resumo técnico</th>
+      </tr>
+    </thead>
+    <tbody id="rows">
+      <tr><td colspan="7" class="empty">carregando…</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    const POLL_MS = 10000;
+
+    function fmtPct(v) {
+      return (v * 100).toFixed(0) + "%";
+    }
+
+    function fmtTime(ts) {
+      if (!ts) return "–";
+      return new Date(ts * 1000).toLocaleTimeString("pt-BR");
+    }
+
+    function render(data) {
+      document.getElementById("provider").textContent = data.provider;
+      document.getElementById("updated-at").textContent = fmtTime(data.updated_at);
+      document.getElementById("updating-badge").style.display = data.updating ? "inline-block" : "none";
+
+      const errorEl = document.getElementById("error");
+      if (data.error) {
+        errorEl.textContent = "Erro na última atualização: " + data.error;
+        errorEl.style.display = "block";
+      } else {
+        errorEl.style.display = "none";
+      }
+
+      const rows = document.getElementById("rows");
+      if (!data.signals || data.signals.length === 0) {
+        rows.innerHTML = '<tr><td colspan="7" class="empty">sem sinais ainda — aguardando primeira atualização</td></tr>';
+        return;
+      }
+
+      rows.innerHTML = data.signals.map(s => `
+        <tr>
+          <td class="symbol">${s.symbol}</td>
+          <td><span class="pill ${s.action}">${s.action}</span></td>
+          <td>
+            <div class="bar-wrap"><div class="bar-fill strength" style="width:${fmtPct(s.strength)}"></div></div>
+            <div class="bar-label">${fmtPct(s.strength)}</div>
+          </td>
+          <td>
+            <div class="bar-wrap"><div class="bar-fill conviction" style="width:${fmtPct(s.conviction)}"></div></div>
+            <div class="bar-label">${fmtPct(s.conviction)}</div>
+          </td>
+          <td>${s.rsi != null ? s.rsi.toFixed(0) : "–"}</td>
+          <td>${s.volatility_regime ?? "–"}</td>
+          <td class="summary">${s.summary ?? ""}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function poll() {
+      try {
+        const res = await fetch("/api/signals");
+        const data = await res.json();
+        render(data);
+      } catch (e) {
+        document.getElementById("error").textContent = "Não foi possível falar com o dashboard: " + e;
+        document.getElementById("error").style.display = "block";
+      } finally {
+        setTimeout(poll, POLL_MS);
+      }
+    }
+
+    poll();
+  </script>
+</body>
+</html>
