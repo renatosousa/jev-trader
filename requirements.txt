@@ -1,1 +1,3 @@
 typesafe-sdk
+pytest
+# MetaTrader5  # opcional: só instalável em Windows ou Wine com o terminal MT5 rodando
