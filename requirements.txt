@@ -1,3 +1,3 @@
 typesafe-sdk
 pytest
-# MetaTrader5  # opcional: só instalável em Windows ou Wine com o terminal MT5 rodando
+mt5linux  # cliente rpyc: fala com MetaTrader5 rodando em Wine (ver signals/market_data.py)

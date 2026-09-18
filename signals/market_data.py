@@ -1,4 +1,5 @@
 import random
+import sys
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -75,30 +76,54 @@ class MockMarketDataProvider(MarketDataProvider):
 
 
 class MT5MarketDataProvider(MarketDataProvider):
-    """Assume que o terminal MT5 já está rodando e logado externamente pelo usuário."""
+    """Fala com o terminal MT5. No Windows, importa o pacote oficial MetaTrader5
+    direto (mais simples, sem Wine). No Linux/macOS, usa a ponte rpyc/mt5linux
+    para um Python rodando dentro do Wine, já que o pacote oficial só existe
+    para Windows. Em ambos os casos, assume que o terminal MT5 já está aberto
+    e logado externamente pelo usuário — esta classe nunca lida com credenciais.
+    """
 
-    def __init__(self):
-        try:
-            import MetaTrader5 as mt5
-        except ImportError as exc:
-            raise RuntimeError(
-                "Pacote MetaTrader5 não instalado. Instale com `pip install MetaTrader5` "
-                "(requer Windows ou Wine com o terminal MT5 rodando)."
-            ) from exc
+    def __init__(self, host: str = "127.0.0.1", port: int = 18812, use_bridge: bool | None = None):
+        if use_bridge is None:
+            use_bridge = sys.platform != "win32"
 
-        if not mt5.initialize():
+        if use_bridge:
+            try:
+                import rpyc
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Pacote rpyc não instalado. Instale com `pip install mt5linux`."
+                ) from exc
+
+            try:
+                self._conn = rpyc.classic.connect(host, port)
+            except ConnectionRefusedError as exc:
+                raise RuntimeError(
+                    f"não foi possível conectar ao servidor mt5linux em {host}:{port}. "
+                    "Confirme que `wine python.exe -m mt5linux` está rodando e que o "
+                    "terminal MT5 está aberto e logado."
+                ) from exc
+            self._mt5 = self._conn.modules["MetaTrader5"]
+        else:
+            try:
+                import MetaTrader5 as mt5
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Pacote MetaTrader5 não instalado. Instale com `pip install MetaTrader5`."
+                ) from exc
+            self._mt5 = mt5
+
+        if not self._mt5.initialize():
             raise RuntimeError(
-                f"mt5.initialize() falhou: {mt5.last_error()}. "
+                f"mt5.initialize() falhou: {self._mt5.last_error()}. "
                 "Confirme que o terminal MT5 está aberto e logado."
             )
 
     def get_bars(self, symbol: str, timeframe_minutes: int, count: int) -> list[Bar]:
-        import MetaTrader5 as mt5
-
-        timeframe = _mt5_timeframe(mt5, timeframe_minutes)
-        rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
+        timeframe = _mt5_timeframe(self._mt5, timeframe_minutes)
+        rates = self._mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
         if rates is None:
-            raise RuntimeError(f"copy_rates_from_pos falhou para {symbol}: {mt5.last_error()}")
+            raise RuntimeError(f"copy_rates_from_pos falhou para {symbol}: {self._mt5.last_error()}")
 
         return [
             Bar(
@@ -113,11 +138,9 @@ class MT5MarketDataProvider(MarketDataProvider):
         ]
 
     def get_last_price(self, symbol: str) -> float:
-        import MetaTrader5 as mt5
-
-        tick = mt5.symbol_info_tick(symbol)
+        tick = self._mt5.symbol_info_tick(symbol)
         if tick is None:
-            raise RuntimeError(f"symbol_info_tick falhou para {symbol}: {mt5.last_error()}")
+            raise RuntimeError(f"symbol_info_tick falhou para {symbol}: {self._mt5.last_error()}")
         return float(tick.last or tick.bid)
 
 

@@ -1,10 +1,16 @@
+import sys
+
 from signals.instruments import DEFAULT_BASKET
-from signals.market_data import MockMarketDataProvider
+from signals.market_data import MockMarketDataProvider, MT5MarketDataProvider
 from signals.signal_engine import generate_basket_signals, summarize_basket
 
 if __name__ == "__main__":
-    provider = MockMarketDataProvider(seed=7)
-    symbols = [instrument.symbol for instrument in DEFAULT_BASKET][:3]
+    use_mt5 = "--mt5" in sys.argv
+    provider = MT5MarketDataProvider() if use_mt5 else MockMarketDataProvider(seed=7)
+    symbols = [instrument.symbol for instrument in DEFAULT_BASKET]
+    if use_mt5:
+        # ajuste conforme a nomenclatura de símbolos da sua corretora
+        symbols = ["EURUSD", "GBPUSD", "USDJPY", "USDCHF", "XAUUSD", "XAGUSD"]
 
     signals = generate_basket_signals(symbols, provider, timeframe_minutes=60)
 
