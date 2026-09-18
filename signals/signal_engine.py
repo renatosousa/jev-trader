@@ -9,8 +9,18 @@ from .market_data import MarketDataProvider
 JEV_BRIDGE_URL = "http://127.0.0.1:8787/evaluate"
 BIAS_LEVELS = ["Forte venda", "Venda", "Neutro", "Compra", "Forte compra"]
 
+# Deve ser maior que JEV_MIN_INTERVAL_MS do bridge (bridge/server.mjs) + a
+# latência real da chamada ao Jev: uma requisição pode ficar na fila do
+# bridge esperando o intervalo mínimo entre chamadas antes de ser processada.
+JEV_REQUEST_TIMEOUT_SECONDS = 120
 
-def call_jev_bridge(state: dict, questions: dict, base_url: str = JEV_BRIDGE_URL) -> dict:
+
+def call_jev_bridge(
+    state: dict,
+    questions: dict,
+    base_url: str = JEV_BRIDGE_URL,
+    timeout: float = JEV_REQUEST_TIMEOUT_SECONDS,
+) -> dict:
     body = json.dumps({"state": state, "questions": questions}).encode("utf-8")
     req = urllib.request.Request(
         base_url,
@@ -19,7 +29,7 @@ def call_jev_bridge(state: dict, questions: dict, base_url: str = JEV_BRIDGE_URL
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
